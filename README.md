@@ -107,3 +107,19 @@ npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000) no seu navegador para ver a aplicação em funcionamento. Crie uma conta e comece a usar!
+
+---
+
+## ➕ Criando um usuário de desenvolvimento
+
+O projeto possui uma rota de semente que cria automaticamente um usuário administrador de conveniência. Para utilizá‑la:
+
+1. Defina a variável `SUPABASE_SERVICE_ROLE_KEY` no arquivo `.env.local` (obtida no painel do Supabase).
+2. Inicie o servidor (`npm run dev`).
+3. Envie um **POST** para `/api/seed-dev`, por exemplo:
+
+```bash
+curl -X POST http://localhost:3000/api/seed-dev
+```
+
+O endpoint criará um usuário com **email `dev@local`** e **senha `admin123`** e dará a ele a role `Admin`. Depois disso, use a tela de login para entrar com essas credenciais.

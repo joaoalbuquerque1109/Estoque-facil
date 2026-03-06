@@ -1,9 +1,24 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { getUserRole } from '@/lib/firestore';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+// Mock admin user para desenvolvimento sem autenticação
+const mockAdminUser: SupabaseUser = {
+  id: 'mock-admin-id',
+  aud: 'authenticated',
+  email: 'admin@estoque.local',
+  email_confirmed_at: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  phone: '',
+  confirmed_at: new Date().toISOString(),
+  last_sign_in_at: new Date().toISOString(),
+  app_metadata: { provider: 'mock' },
+  user_metadata: { name: 'Admin' },
+  identities: [],
+  is_anonymous: false,
+} as SupabaseUser;
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -15,54 +30,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({ 
     user: null, 
     userRole: null, 
-    loading: true, 
-    reauthenticate: () => Promise.reject("AuthProvider not yet mounted.") 
+    loading: false, 
+    reauthenticate: () => Promise.resolve() 
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        getUserRole(session.user.id).then(role => setUserRole(role));
-      }
-      setLoading(false);
-    });
-
-    // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const role = await getUserRole(session.user.id);
-        setUserRole(role);
-      } else {
-        setUserRole(null);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription?.unsubscribe();
-  }, []);
+  // Retorna mock admin sem fazer requisições de autenticação
+  const user = mockAdminUser;
+  const userRole = 'Admin';
+  const loading = false;
 
   const reauthenticate = async (password: string) => {
-    if (!user || !user.email) {
-      throw new Error("Nenhum utilizador está logado.");
-    }
-    
-    // Reauthenticate by signing in again
-    const { error } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: password,
-    });
-    
-    if (error) {
-      throw new Error("Falha na reautenticação.");
-    }
+    // Mock function - não faz nada
+    console.log("Reauthenticate called (mock - no-op)");
   };
 
   const value = { user, userRole, loading, reauthenticate };

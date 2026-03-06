@@ -3,7 +3,6 @@
 import Link from "next/link";
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import {
   CircleUser,
@@ -75,21 +74,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   ]
 
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({ 
-        title: "Você saiu com sucesso.",
-        description: "Redirecionando para a página inicial.",
-        variant: "success",
-      });
-      router.push("/");
-    } catch (error) {
-      toast({
-        title: "Erro ao sair",
-        description: "Não foi possível fazer logout. Tente novamente.",
-        variant: "destructive",
-      });
-    }
+    // Mock logout - apenas redireciona
+    router.push("/");
   };
 
   if (loading || !user) {
@@ -104,6 +90,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     router.replace("/login");
     return null;
   }
+
+  // Renderiza direto sem verificações de autenticação
 
   return (
     <SidebarProvider>
