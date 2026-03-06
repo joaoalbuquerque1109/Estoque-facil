@@ -1,3 +1,6 @@
+// PÁGINA DE LOGIN COMENTADA - EM DESENVOLVIMENTO
+// TODO: Descomentar quando for necessário usar autenticação por login/senha
+
 // "use client";
 
 // import { useState } from "react";
@@ -117,3 +120,12 @@
 //     </main>
 //   );
 // }
+
+// PLACEHOLDER - Componente padrão necessário por Next.js
+export default function LoginPlaceholder() {
+  return (
+    <div className="flex h-screen w-full items-center justify-center bg-background">
+      <p className="text-muted-foreground">Página de login desabilitada (em desenvolvimento)</p>
+    </div>
+  );
+}

@@ -53,13 +53,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading, userRole } = useAuth();
   const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
   
-  React.useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.replace('/login');
-      }
-    }
-  }, [user, loading, router]);
+  // TODO: Descomentar após reabilitar página de login
+  // React.useEffect(() => {
+  //   if (!loading) {
+  //     if (!user) {
+  //       router.replace('/login');
+  //     }
+  //   }
+  // }, [user, loading, router]);
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
@@ -78,10 +79,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       toast({ 
         title: "Você saiu com sucesso.",
-        description: "Redirecionando para a página de login.",
+        description: "Redirecionando para a página inicial.",
         variant: "success",
       });
-      router.push("/login");
+      router.push("/");
     } catch (error) {
       toast({
         title: "Erro ao sair",

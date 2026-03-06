@@ -8,7 +8,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/login');
+    // Redirecionado para dashboard em vez de login (que está desabilitado)
+    router.replace('/dashboard');
   }, [router]);
 
   return (
