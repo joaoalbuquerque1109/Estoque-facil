@@ -1,9 +1,5 @@
-import { db } from './firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, runTransaction, increment, QueryConstraint, orderBy, limit, getDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+import { supabase } from './supabase';
 import { parseISO } from 'date-fns';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from './firebase';
 
 export type Product = {
     id: string;
@@ -73,17 +69,18 @@ type ProductFilters = {
     materialType?: 'consumo' | 'permanente';
 }
 
-const productsCollection = collection(db, 'products');
-const movementsCollection = collection(db, 'movements');
-
 export const getUserRole = async (uid: string): Promise<string | null> => {
   try {
-    const userDocRef = doc(db, "users", uid);
-    const userDoc = await getDoc(userDocRef);
-    if (userDoc.exists()) {
-      return userDoc.data().role || null;
+    const { data, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', uid)
+      .single();
+    
+    if (error || !data) {
+      return null;
     }
-    return null;
+    return data.role || null;
   } catch (error) {
     console.error("Erro ao buscar a função do utilizador:", error);
     return null;
@@ -92,55 +89,88 @@ export const getUserRole = async (uid: string): Promise<string | null> => {
 
 export const getProducts = async (filters: ProductFilters = {}): Promise<Product[]> => {
     const { searchTerm, materialType } = filters;
-    const constraints: QueryConstraint[] = [];
-
-    if (materialType) {
-        constraints.push(where('type', '==', materialType));
-    }
-
-    if (searchTerm && searchTerm.length > 0) {
-        const lowercasedTerm = searchTerm.toLowerCase();
-        const nameQuery = query(productsCollection, ...constraints, 
-            orderBy('name_lowercase'), 
-            where('name_lowercase', '>=', lowercasedTerm), 
-            where('name_lowercase', '<=', lowercasedTerm + '\uf8ff')
-        );
-        const codeQuery = query(productsCollection, ...constraints, 
-            where('code', '==', searchTerm)
-        );
-
-        const [nameSnapshot, codeSnapshot] = await Promise.all([
-            getDocs(nameQuery),
-            getDocs(codeQuery)
-        ]);
-
-        const productsMap = new Map<string, Product>();
-        nameSnapshot.docs.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
-        codeSnapshot.docs.forEach(doc => productsMap.set(doc.id, { id: doc.id, ...doc.data() } as Product));
-
-        return Array.from(productsMap.values());
-    } else {
-        constraints.push(orderBy('name_lowercase'));
-        const finalQuery = query(productsCollection, ...constraints);
-        const snapshot = await getDocs(finalQuery);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+    
+    try {
+        let query = supabase.from('products').select('*');
+        
+        if (materialType) {
+            query = query.eq('type', materialType);
+        }
+        
+        if (searchTerm && searchTerm.length > 0) {
+            const lowercasedTerm = searchTerm.toLowerCase();
+            query = query.or(
+                `name_lowercase.ilike.%${lowercasedTerm}%,code.eq.${searchTerm}`
+            );
+        }
+        
+        const { data, error } = await query.order('name_lowercase', { ascending: true });
+        
+        if (error) {
+            console.error("Erro ao buscar produtos:", error);
+            return [];
+        }
+        
+        return data.map(doc => ({
+            id: doc.id,
+            ...doc
+        })) as Product[];
+    } catch (error) {
+        console.error("Erro ao buscar produtos:", error);
+        return [];
     }
 };
 
 
 export const addProduct = async (productData: Omit<Product, 'id'>): Promise<string> => {
-    const docRef = await addDoc(productsCollection, productData);
-    return docRef.id;
+    try {
+        const { data, error } = await supabase
+            .from('products')
+            .insert([productData])
+            .select('id')
+            .single();
+        
+        if (error) {
+            throw error;
+        }
+        
+        return data.id;
+    } catch (error) {
+        console.error("Erro ao adicionar produto:", error);
+        throw error;
+    }
 };
 
 export const updateProduct = async (productId: string, productData: Partial<Product>): Promise<void> => {
-    const productDoc = doc(db, 'products', productId);
-    await updateDoc(productDoc, productData);
+    try {
+        const { error } = await supabase
+            .from('products')
+            .update(productData)
+            .eq('id', productId);
+        
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar produto:", error);
+        throw error;
+    }
 };
 
 export const deleteProduct = async (productId: string): Promise<void> => {
-    const productDoc = doc(db, 'products', productId);
-    await deleteDoc(productDoc);
+    try {
+        const { error } = await supabase
+            .from('products')
+            .delete()
+            .eq('id', productId);
+        
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        console.error("Erro ao eliminar produto:", error);
+        throw error;
+    }
 };
 
 type ImageObject = {
@@ -155,70 +185,106 @@ export const uploadImage = async (imageObject: ImageObject) => {
   }
   try {
     const { base64, fileName, contentType } = imageObject;
-    const storage = getStorage();
-    const storageRef = ref(storage, `products/${Date.now()}_${fileName}`);
-    const metadata = { contentType: contentType };
-    const snapshot = await uploadString(storageRef, base64, 'data_url', metadata);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
+    const fileNameWithTimestamp = `products/${Date.now()}_${fileName}`;
+    
+    // Convert base64 to blob
+    const byteCharacters = atob(base64.split(',')[1] || base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: contentType });
+    
+    const { data, error } = await supabase.storage
+      .from('products')
+      .upload(fileNameWithTimestamp, blob, {
+        contentType: contentType,
+        upsert: false
+      });
+    
+    if (error) {
+      console.error("Erro ao fazer upload da imagem:", error);
+      return "https://placehold.co/40x40.png";
+    }
+    
+    const { data: publicData } = supabase.storage
+      .from('products')
+      .getPublicUrl(fileNameWithTimestamp);
+    
+    return publicData.publicUrl;
   } catch (error) {
     console.error("Erro ao fazer upload da imagem com Base64:", error);
-    throw error;
+    return "https://placehold.co/40x40.png";
   }
 };
 
 export const generateNextItemCode = async (prefix: string): Promise<string> => {
-  const q = query(
-    productsCollection,
-    where('code', '>=', prefix),
-    where('code', '<=', prefix + '\uf8ff'),
-    orderBy('code', 'desc'),
-    limit(1)
-  );
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    return `${prefix}-001`;
-  } else {
-    const lastCode = querySnapshot.docs[0].data().code;
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('code')
+      .ilike('code', `${prefix}%`)
+      .order('code', { ascending: false })
+      .limit(1);
+    
+    if (error || !data || data.length === 0) {
+      return `${prefix}-001`;
+    }
+    
+    const lastCode = data[0].code;
     const lastNumber = parseInt(lastCode.split('-').pop() || '0', 10);
     const nextNumber = lastNumber + 1;
     const formattedNextNumber = nextNumber.toString().padStart(3, '0');
+    
     return `${prefix}-${formattedNextNumber}`;
+  } catch (error) {
+    console.error("Erro ao gerar próximo código de item:", error);
+    return `${prefix}-001`;
   }
 };
 
 export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
     try {
-        await runTransaction(db, async (transaction) => {
-            for (const item of entryData.items) {
-                const productRef = doc(db, "products", item.id);
-                const productDoc = await transaction.get(productRef);
-
-                if (!productDoc.exists()) {
-                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
-                }
-                
-                transaction.update(productRef, { quantity: increment(item.quantity) });
-
-                const movementData: Omit<Movement, 'id'> = {
-                    productId: item.id,
-                    date: entryData.date,
-                    type: 'Entrada',
-                    quantity: item.quantity,
-                    responsible: entryData.responsible,
-                    supplier: entryData.supplier,
-                    entryType: entryData.entryType,
-                    productType: productDoc.data().type,
-                };
-
-                if (entryData.invoice) {
-                    movementData.invoice = entryData.invoice;
-                }
-
-                const movementRef = doc(collection(db, "movements"));
-                transaction.set(movementRef, movementData);
+        for (const item of entryData.items) {
+            // Get current product
+            const { data: productData, error: productError } = await supabase
+                .from('products')
+                .select('id, quantity, type')
+                .eq('id', item.id)
+                .single();
+            
+            if (productError || !productData) {
+                throw new Error(`Produto com ID ${item.id} não encontrado.`);
             }
-        });
+            
+            // Update product quantity
+            const newQuantity = productData.quantity + item.quantity;
+            await supabase
+                .from('products')
+                .update({ quantity: newQuantity })
+                .eq('id', item.id);
+            
+            // Add movement record
+            const movementData: Omit<Movement, 'id'> = {
+                productId: item.id,
+                date: entryData.date,
+                type: 'Entrada',
+                quantity: item.quantity,
+                responsible: entryData.responsible,
+                supplier: entryData.supplier,
+                entryType: entryData.entryType,
+                productType: productData.type,
+            };
+            
+            if (entryData.invoice) {
+                movementData.invoice = entryData.invoice;
+            }
+            
+            await supabase
+                .from('movements')
+                .insert([movementData]);
+        }
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
@@ -227,35 +293,45 @@ export const finalizeEntry = async (entryData: EntryData): Promise<void> => {
 
 export const finalizeExit = async (exitData: ExitData): Promise<void> => {
     try {
-        await runTransaction(db, async (transaction) => {
-            for (const item of exitData.items) {
-                const productRef = doc(db, "products", item.id);
-                const productDoc = await transaction.get(productRef);
-
-                if (!productDoc.exists()) {
-                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
-                }
-                
-                const currentQuantity = productDoc.data().quantity;
-                if (currentQuantity < item.quantity) {
-                    throw new Error(`Estoque insuficiente para ${productDoc.data().name}.`);
-                }
-
-                transaction.update(productRef, { quantity: increment(-item.quantity) });
-
-                const movementData: Omit<Movement, 'id'> = {
-                    productId: item.id,
-                    date: exitData.date,
-                    type: 'Saída',
-                    quantity: item.quantity,
-                    responsible: exitData.responsible,
-                    department: exitData.department,
-                    productType: productDoc.data().type,
-                };
-                const movementRef = doc(collection(db, "movements"));
-                transaction.set(movementRef, movementData);
+        for (const item of exitData.items) {
+            // Get current product
+            const { data: productData, error: productError } = await supabase
+                .from('products')
+                .select('id, quantity, type, name')
+                .eq('id', item.id)
+                .single();
+            
+            if (productError || !productData) {
+                throw new Error(`Produto com ID ${item.id} não encontrado.`);
             }
-        });
+            
+            const currentQuantity = productData.quantity;
+            if (currentQuantity < item.quantity) {
+                throw new Error(`Estoque insuficiente para ${productData.name}.`);
+            }
+            
+            // Update product quantity
+            const newQuantity = currentQuantity - item.quantity;
+            await supabase
+                .from('products')
+                .update({ quantity: newQuantity })
+                .eq('id', item.id);
+            
+            // Add movement record
+            const movementData: Omit<Movement, 'id'> = {
+                productId: item.id,
+                date: exitData.date,
+                type: 'Saída',
+                quantity: item.quantity,
+                responsible: exitData.responsible,
+                department: exitData.department,
+                productType: productData.type,
+            };
+            
+            await supabase
+                .from('movements')
+                .insert([movementData]);
+        }
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
@@ -264,29 +340,40 @@ export const finalizeExit = async (exitData: ExitData): Promise<void> => {
 
 export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
      try {
-        await runTransaction(db, async (transaction) => {
-            for (const item of returnData.items) {
-                const productRef = doc(db, "products", item.id);
-                const productDoc = await transaction.get(productRef);
-                 if (!productDoc.exists()) {
-                    throw new Error(`Produto com ID ${item.id} não encontrado.`);
-                }
-
-                transaction.update(productRef, { quantity: increment(item.quantity) });
-
-                const movementData: Omit<Movement, 'id'> = {
-                    productId: item.id,
-                    date: returnData.date,
-                    type: 'Devolução',
-                    quantity: item.quantity,
-                    responsible: returnData.responsible,
-                    department: returnData.department,
-                    productType: productDoc.data().type,
-                };
-                const movementRef = doc(collection(db, "movements"));
-                transaction.set(movementRef, movementData);
+        for (const item of returnData.items) {
+            // Get current product
+            const { data: productData, error: productError } = await supabase
+                .from('products')
+                .select('id, quantity, type')
+                .eq('id', item.id)
+                .single();
+            
+            if (productError || !productData) {
+                throw new Error(`Produto com ID ${item.id} não encontrado.`);
             }
-        });
+            
+            // Update product quantity
+            const newQuantity = productData.quantity + item.quantity;
+            await supabase
+                .from('products')
+                .update({ quantity: newQuantity })
+                .eq('id', item.id);
+            
+            // Add movement record
+            const movementData: Omit<Movement, 'id'> = {
+                productId: item.id,
+                date: returnData.date,
+                type: 'Devolução',
+                quantity: item.quantity,
+                responsible: returnData.responsible,
+                department: returnData.department,
+                productType: productData.type,
+            };
+            
+            await supabase
+                .from('movements')
+                .insert([movementData]);
+        }
     } catch (e) {
         console.error("Transaction failed: ", e);
         throw e;
@@ -295,39 +382,89 @@ export const finalizeReturn = async (returnData: ReturnData): Promise<void> => {
 
 export const getMovements = async (filters: MovementFilters = {}): Promise<Movement[]> => {
     const { startDate, endDate, movementType, materialType, department } = filters;
-    const movementsCollection = collection(db, 'movements');
-    let constraints: QueryConstraint[] = [];
-
-    if (startDate) { constraints.push(where('date', '>=', startDate)); }
-    if (endDate) {
-        const toDate = new Date(parseISO(endDate));
-        toDate.setHours(23, 59, 59, 999);
-        constraints.push(where('date', '<=', toDate.toISOString()));
-    }
-    if (movementType && movementType !== 'all') { constraints.push(where('type', '==', movementType)); }
-    if (department && department !== 'all') { constraints.push(where('department', '==', department)); }
     
-    if (materialType && materialType !== 'all') {
-        constraints.push(where('productType', '==', materialType));
+    try {
+        let query = supabase.from('movements').select('*');
+        
+        if (startDate) {
+            query = query.gte('date', startDate);
+        }
+        
+        if (endDate) {
+            const toDate = new Date(parseISO(endDate));
+            toDate.setHours(23, 59, 59, 999);
+            query = query.lte('date', toDate.toISOString());
+        }
+        
+        if (movementType && movementType !== 'all') {
+            query = query.eq('type', movementType);
+        }
+        
+        if (department && department !== 'all') {
+            query = query.eq('department', department);
+        }
+        
+        if (materialType && materialType !== 'all') {
+            query = query.eq('productType', materialType);
+        }
+        
+        const { data, error } = await query.order('date', { ascending: false });
+        
+        if (error) {
+            console.error("Erro ao buscar movimentos:", error);
+            return [];
+        }
+        
+        return data.map(doc => ({
+            id: doc.id,
+            ...doc
+        })) as Movement[];
+    } catch (error) {
+        console.error("Erro ao buscar movimentos:", error);
+        return [];
     }
-    
-    constraints.push(orderBy('date', 'desc'));
-
-    const finalQuery = query(movementsCollection, ...constraints);
-    const snapshot = await getDocs(finalQuery);
-
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
 };
 
 export const getMovementsForItem = async (productId: string): Promise<Movement[]> => {
-    const q = query(movementsCollection, where('productId', '==', productId), orderBy('date', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Movement));
+    try {
+        const { data, error } = await supabase
+            .from('movements')
+            .select('*')
+            .eq('productId', productId)
+            .order('date', { ascending: false });
+        
+        if (error) {
+            console.error("Erro ao buscar movimentos do produto:", error);
+            return [];
+        }
+        
+        return data.map(doc => ({
+            id: doc.id,
+            ...doc
+        })) as Movement[];
+    } catch (error) {
+        console.error("Erro ao buscar movimentos do produto:", error);
+        return [];
+    }
 }
 
 export const addMovement = async (movementData: Omit<Movement, 'id'>): Promise<string> => {
-    const docRef = await addDoc(movementsCollection, movementData);
-    return docRef.id;
+    try {
+        const { data, error } = await supabase
+            .from('movements')
+            .insert([movementData])
+            .select('id')
+            .single();
+        
+        if (error) {
+            throw error;
+        }
+        
+        return data.id;
+    } catch (error) {
+        console.error("Erro ao adicionar movimento:", error);
+        throw error;
+    }
 };
 
 export interface User {
@@ -336,27 +473,37 @@ export interface User {
   role: 'Admin' | 'Operator';
 }
 
-// NOVA VERSÃO - Busca utilizadores diretamente do Firestore
 export const getUsers = async (): Promise<User[]> => {
   try {
-    const usersCollection = collection(db, 'users');
-    const userSnapshot = await getDocs(usersCollection);
-    const userList = userSnapshot.docs.map(doc => ({
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, role');
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data.map(doc => ({
       uid: doc.id,
-      ...(doc.data() as { email: string; role: 'Admin' | 'Operator' })
+      email: doc.email,
+      role: doc.role as 'Admin' | 'Operator'
     }));
-    return userList;
   } catch (error) {
     console.error("Erro ao buscar utilizadores:", error);
     throw new Error("Não foi possível buscar os utilizadores.");
   }
 };
 
-// NOVA VERSÃO - Atualiza a role diretamente no Firestore
 export const updateUserRole = async (uid: string, role: 'Admin' | 'Operator'): Promise<void> => {
   try {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, { role: role });
+    const { error } = await supabase
+      .from('users')
+      .update({ role: role })
+      .eq('id', uid);
+    
+    if (error) {
+      throw error;
+    }
   } catch (error) {
     console.error("Erro ao atualizar a role do utilizador:", error);
     throw new Error("Não foi possível atualizar a role do utilizador.");

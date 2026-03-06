@@ -2,7 +2,6 @@
 "use client";
 
 import * as React from "react";
-import { GoogleAuthProvider, signInWithPopup, getAuth } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { app } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminSyncAuthDialogProps {
   isOpen: boolean;
@@ -23,22 +22,18 @@ interface AdminSyncAuthDialogProps {
 
 export function AdminSyncAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: AdminSyncAuthDialogProps) {
   const { toast } = useToast();
+  const { user, userRole } = useAuth();
   const [isAuthenticating, setIsAuthenticating] = React.useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsAuthenticating(true);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-
+    
     try {
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      
-      if (result.user.email !== "phenrique646@gmail.com") {
+      // Check if user is admin
+      if (userRole !== 'Admin') {
         toast({
             title: "Authentication Failed",
-            description: "Only the admin user (phenrique646@gmail.com) can sync the spreadsheet.",
+            description: "Only admin users can sync the spreadsheet.",
             variant: "destructive",
         });
         setIsAuthenticating(false);
@@ -46,7 +41,8 @@ export function AdminSyncAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: Adm
         return
       }
 
-      onAuthSuccess(credential);
+      // Emit success with user info
+      onAuthSuccess({ user: user });
       onOpenChange(false);
     } catch (error: any) {
       toast({
@@ -70,21 +66,20 @@ export function AdminSyncAuthDialog({ isOpen, onOpenChange, onAuthSuccess }: Adm
           <DialogTitle>Administrative Authentication</DialogTitle>
           <DialogDescription>
             Permission from an administrator is required to sync the spreadsheet.
-            Please log in with a valid Google account.
+            Only admin users can perform this action.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
             <p className="text-sm text-muted-foreground">
-                You will be prompted to sign in with your Google account to authorize access to Google Sheets.
-                For this demo, please use `phenrique646@gmail.com` as the user.
+                Your current role: <strong>{userRole || 'None'}</strong>
             </p>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleGoogleSignIn} disabled={isAuthenticating}>
-            {isAuthenticating ? "Authenticating..." : "Login with Google"}
+          <Button type="button" onClick={handleGoogleSignIn} disabled={isAuthenticating || userRole !== 'Admin'}>
+            {isAuthenticating ? "Authenticating..." : "Authorize"}
           </Button>
         </DialogFooter>
       </DialogContent>

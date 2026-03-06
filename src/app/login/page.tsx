@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Warehouse, Loader2, Eye, EyeOff } from "lucide-react";
-import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
@@ -30,7 +29,15 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       toast({
         title: "Login bem-sucedido!",
         description: "Redirecionando para o dashboard.",

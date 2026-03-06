@@ -1,12 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User, EmailAuthProvider, reauthenticateWithCredential  } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { getUserRole } from '@/lib/firestore';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface AuthContextType {
-  user: User | null;
+  user: SupabaseUser | null;
   userRole: string | null;
   loading: boolean;
   reauthenticate: (password: string) => Promise<void>;
@@ -20,15 +20,25 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const role = await getUserRole(currentUser.uid);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        getUserRole(session.user.id).then(role => setUserRole(role));
+      }
+      setLoading(false);
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const role = await getUserRole(session.user.id);
         setUserRole(role);
       } else {
         setUserRole(null);
@@ -36,15 +46,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => subscription?.unsubscribe();
   }, []);
 
   const reauthenticate = async (password: string) => {
-    if (!user) {
-        throw new Error("Nenhum utilizador está logado.");
+    if (!user || !user.email) {
+      throw new Error("Nenhum utilizador está logado.");
     }
-    const credential = EmailAuthProvider.credential(user.email!, password);
-    await reauthenticateWithCredential(user, credential);
+    
+    // Reauthenticate by signing in again
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: password,
+    });
+    
+    if (error) {
+      throw new Error("Falha na reautenticação.");
+    }
   };
 
   const value = { user, userRole, loading, reauthenticate };

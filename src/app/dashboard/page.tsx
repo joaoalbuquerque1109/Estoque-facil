@@ -51,8 +51,6 @@ import { getProducts, getMovements } from "@/lib/firestore";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 
 export default function DashboardPage() {

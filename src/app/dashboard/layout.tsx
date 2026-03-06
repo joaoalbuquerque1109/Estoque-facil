@@ -3,7 +3,7 @@
 import Link from "next/link";
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { signOut, User } from "firebase/auth";
+import { supabase } from "@/lib/supabase";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import {
   CircleUser,
@@ -44,7 +44,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
 
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -76,7 +75,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
       toast({ 
         title: "Você saiu com sucesso.",
         description: "Redirecionando para a página de login.",
