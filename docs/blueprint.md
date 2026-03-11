@@ -1,4 +1,4 @@
-# **App Name**: AlmoxFlow
+# **App Name**: EasyStock
 
 ## Core Features:
 

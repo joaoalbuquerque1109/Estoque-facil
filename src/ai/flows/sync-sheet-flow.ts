@@ -57,7 +57,7 @@ const syncToSheetFlow = ai.defineFlow(
     const spreadsheet = await sheets.spreadsheets.create({
         requestBody: {
             properties: {
-                title: 'AlmoxFlow Inventory',
+                title: 'EasyStock Inventory',
             },
         },
     });

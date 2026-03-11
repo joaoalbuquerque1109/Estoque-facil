@@ -1,6 +1,6 @@
-#  AlmoxFlow - Sistema de Gerenciamento de Estoque
+#  EasyStock - Sistema de Gerenciamento de Estoque
 
-AlmoxFlow é um sistema web completo para gerenciamento de inventário e almoxarifado, projetado para ser uma solução moderna e eficiente para o controle de entrada e saída de materiais. Construído com Next.js e Firebase, o projeto oferece uma interface de usuário reativa e um backend robusto e escalável.
+EasyStock é um sistema web completo para gerenciamento de inventário e almoxarifado, projetado para ser uma solução moderna e eficiente para o controle de entrada e saída de materiais. Construído com Next.js e Firebase, o projeto oferece uma interface de usuário reativa e um backend robusto e escalável.
 
 Este projeto foi desenvolvido como um sistema de portfólio para demonstrar competências em desenvolvimento full-stack com tecnologias modernas.
 
@@ -57,7 +57,7 @@ Siga os passos abaixo para executar o projeto localmente.
 ### 1. Configuração do Projeto Firebase
 
 1.  Acesse o [Console do Firebase](https://console.firebase.google.com/).
-2.  Crie um novo projeto (ou use um existente). O nome do projeto neste repositório é "AlmoxFlow".
+2.  Crie um novo projeto (ou use um existente). O nome do projeto neste repositório é "EasyStock".
 3.  Adicione um novo aplicativo da Web ao seu projeto.
 4.  Copie as credenciais do Firebase (`firebaseConfig`) fornecidas a você.
 5.  Ative os seguintes serviços no seu projeto Firebase:
