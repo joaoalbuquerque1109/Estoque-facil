@@ -1,6 +1,8 @@
 import type {Metadata} from 'next';
+import { Suspense } from "react";
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { NavigationLoaderProvider, RouteReadySignal } from "@/components/navigation-loader";
 
 export const metadata: Metadata = {
   title: 'EasyStock',
@@ -20,8 +22,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet"></link>
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <NavigationLoaderProvider>
+          {children}
+          <Suspense fallback={null}>
+            <RouteReadySignal />
+          </Suspense>
+          <Toaster />
+        </NavigationLoaderProvider>
       </body>
     </html>
   );

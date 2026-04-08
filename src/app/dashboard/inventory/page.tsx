@@ -272,10 +272,12 @@ const handleUpdateItem = async (updatedItemData: any) => {
               Consulte e gerencie todos os itens em estoque.
             </p>
           </div>
-          <Button onClick={() => setIsAddSheetOpen(true)} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2" />
-            Adicionar Novo Item
-          </Button>
+          {userRole === 'Admin' ? (
+            <Button onClick={() => setIsAddSheetOpen(true)} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2" />
+              Adicionar Novo Item
+            </Button>
+          ) : null}
         </div>
 
         <Card>
@@ -394,11 +396,13 @@ const handleUpdateItem = async (updatedItemData: any) => {
           </CardContent>
         </Card>
       </div>
-      <AddItemSheet 
-        isOpen={isAddSheetOpen}
-        onOpenChange={setIsAddSheetOpen}
-        onItemAdded={handleAddItem}
-      />
+      {userRole === 'Admin' ? (
+        <AddItemSheet 
+          isOpen={isAddSheetOpen}
+          onOpenChange={setIsAddSheetOpen}
+          onItemAdded={handleAddItem}
+        />
+      ) : null}
       {selectedItem && (
         <EditItemSheet
           isOpen={isEditSheetOpen}
@@ -414,11 +418,6 @@ const handleUpdateItem = async (updatedItemData: any) => {
           item={selectedItem}
         />
       )}
-      <ReauthDialog
-        isOpen={isReauthOpen}
-        onOpenChange={setIsReauthOpen}
-        onSuccess={handleReauthSuccess}
-      />
       <ReauthDialog
         isOpen={isReauthOpen}
         onOpenChange={setIsReauthOpen}

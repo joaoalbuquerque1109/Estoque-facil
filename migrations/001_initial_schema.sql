@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   quantity INTEGER NOT NULL DEFAULT 0,
   unit TEXT NOT NULL,
   category TEXT NOT NULL,
+  reference TEXT NOT NULL DEFAULT 'N/A',
   image TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
@@ -102,6 +103,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to create a default profile whenever a new auth user is created
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role)
+  VALUES (NEW.id, NEW.email, 'Operator'::user_role)
+  ON CONFLICT (id) DO UPDATE
+  SET
+    email = EXCLUDED.email,
+    role = COALESCE(public.profiles.role, 'Operator'::user_role),
+    updated_at = TIMEZONE('utc'::text, NOW());
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper function to check whether a user is an admin without triggering RLS recursion
+CREATE OR REPLACE FUNCTION public.is_admin(check_user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = check_user_id
+      AND role = 'Admin'::user_role
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- Helper function to get the role of a user without relying on table policies
+CREATE OR REPLACE FUNCTION public.get_user_role(user_id UUID)
+RETURNS user_role AS $$
+DECLARE
+  resolved_role user_role;
+BEGIN
+  SELECT role INTO resolved_role
+  FROM public.profiles
+  WHERE id = user_id;
+
+  RETURN resolved_role;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- Trigger for profiles
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -113,6 +155,20 @@ CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON public.products
 -- Trigger for movements
 CREATE TRIGGER update_movements_updated_at BEFORE UPDATE ON public.movements
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger for auth.users -> public.profiles sync
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Backfill profiles for users that already exist in auth.users
+INSERT INTO public.profiles (id, email, role)
+SELECT au.id, au.email, 'Operator'::user_role
+FROM auth.users au
+LEFT JOIN public.profiles p ON p.id = au.id
+WHERE p.id IS NULL
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================
@@ -134,19 +190,20 @@ ALTER TABLE public.movements ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read their own profile"
   ON public.profiles
   FOR SELECT
-  USING (auth.uid() = id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (auth.uid() = id OR public.is_admin(auth.uid()));
 
 -- Profiles: Only admins can update roles
 CREATE POLICY "Only admins can update user roles"
   ON public.profiles
   FOR UPDATE
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- Profiles: Admins can insert
 CREATE POLICY "Admins can insert profiles"
   ON public.profiles
   FOR INSERT
-  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- PRODUCTS POLICIES
 -- Products: All authenticated users can read
@@ -159,19 +216,20 @@ CREATE POLICY "Authenticated users can read products"
 CREATE POLICY "Only admins can insert products"
   ON public.products
   FOR INSERT
-  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- Products: Only admins can update products
 CREATE POLICY "Only admins can update products"
   ON public.products
   FOR UPDATE
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 -- Products: Only admins can delete products
 CREATE POLICY "Only admins can delete products"
   ON public.products
   FOR DELETE
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (public.is_admin(auth.uid()));
 
 -- MOVEMENTS POLICIES
 -- Movements: All authenticated users can read
@@ -190,12 +248,13 @@ CREATE POLICY "Authenticated users can insert movements"
 CREATE POLICY "Only admins can update movements"
   ON public.movements
   FOR UPDATE
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
 
 CREATE POLICY "Only admins can delete movements"
   ON public.movements
   FOR DELETE
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'Admin'::user_role);
+  USING (public.is_admin(auth.uid()));
 
 
 -- ============================================================================
@@ -205,18 +264,18 @@ CREATE POLICY "Only admins can delete movements"
 -- Note: Comment out these INSERT statements in production
 -- They are included for rapid development/testing
 
-INSERT INTO public.products (name, name_lowercase, code, patrimony, type, quantity, unit, category, image)
+INSERT INTO public.products (name, name_lowercase, code, patrimony, type, quantity, unit, category, reference, image)
 VALUES
-  ('Caneta Azul', 'caneta azul', '001-25', 'N/A', 'consumo'::product_type, 92, 'und', 'Escritório', 'https://placehold.co/40x40.png'),
-  ('Caneta Preta', 'caneta preta', '002-25', 'N/A', 'consumo'::product_type, 63, 'und', 'Escritório', 'https://placehold.co/40x40.png'),
-  ('Caneta Vermelha', 'caneta vermelha', '003-25', 'N/A', 'consumo'::product_type, 19, 'und', 'Escritório', 'https://placehold.co/40x40.png'),
-  ('Papel A4', 'papel a4', '005-25', 'N/A', 'consumo'::product_type, 11, 'Resma', 'Escritório', 'https://placehold.co/40x40.png'),
-  ('Monitor Dell 24''', 'monitor dell 24''''', '004-25', '123456', 'permanente'::product_type, 1, 'und', 'Informática', 'https://placehold.co/40x40.png'),
-  ('Mouse Logitech', 'mouse logitech', '006-25', '123457', 'permanente'::product_type, 5, 'und', 'Informática', 'https://placehold.co/40x40.png'),
-  ('Teclado ABNT2', 'teclado abnt2', '007-25', 'N/A', 'consumo'::product_type, 8, 'und', 'Informática', 'https://placehold.co/40x40.png'),
-  ('Cadeira de Escritório', 'cadeira de escritório', '008-25', '123458', 'permanente'::product_type, 3, 'und', 'Mobiliário', 'https://placehold.co/40x40.png'),
-  ('Grampeador', 'grampeador', '009-25', 'N/A', 'consumo'::product_type, 25, 'und', 'Escritório', 'https://placehold.co/40x40.png'),
-  ('Clips de Papel', 'clips de papel', '010-25', 'N/A', 'consumo'::product_type, 10, 'caixa', 'Escritório', 'https://placehold.co/40x40.png')
+  ('Caneta Azul', 'caneta azul', '001-25', 'N/A', 'consumo'::product_type, 92, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
+  ('Caneta Preta', 'caneta preta', '002-25', 'N/A', 'consumo'::product_type, 63, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
+  ('Caneta Vermelha', 'caneta vermelha', '003-25', 'N/A', 'consumo'::product_type, 19, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
+  ('Papel A4', 'papel a4', '005-25', 'N/A', 'consumo'::product_type, 11, 'Resma', 'Escritório', 'Prateleira B-02', 'https://placehold.co/40x40.png'),
+  ('Monitor Dell 24''', 'monitor dell 24''''', '004-25', '123456', 'permanente'::product_type, 1, 'und', 'Informática', 'Sala TI', 'https://placehold.co/40x40.png'),
+  ('Mouse Logitech', 'mouse logitech', '006-25', '123457', 'permanente'::product_type, 5, 'und', 'Informática', 'Sala TI', 'https://placehold.co/40x40.png'),
+  ('Teclado ABNT2', 'teclado abnt2', '007-25', 'N/A', 'consumo'::product_type, 8, 'und', 'Informática', 'Armário TI', 'https://placehold.co/40x40.png'),
+  ('Cadeira de Escritório', 'cadeira de escritório', '008-25', '123458', 'permanente'::product_type, 3, 'und', 'Mobiliário', 'Sala Administrativa', 'https://placehold.co/40x40.png'),
+  ('Grampeador', 'grampeador', '009-25', 'N/A', 'consumo'::product_type, 25, 'und', 'Escritório', 'Prateleira C-03', 'https://placehold.co/40x40.png'),
+  ('Clips de Papel', 'clips de papel', '010-25', 'N/A', 'consumo'::product_type, 10, 'caixa', 'Escritório', 'Prateleira C-03', 'https://placehold.co/40x40.png')
 ON CONFLICT (code) DO NOTHING;
 
 
@@ -247,18 +306,6 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql;
-
--- Function to get user role
-CREATE OR REPLACE FUNCTION public.get_user_role(user_id UUID)
-RETURNS user_role AS $$
-DECLARE
-  user_role user_role;
-BEGIN
-  SELECT role INTO user_role FROM public.profiles WHERE id = user_id;
-  RETURN user_role;
-END;
-$$ LANGUAGE plpgsql;
-
 
 -- ============================================================================
 -- 10. STORAGE BUCKET SETUP

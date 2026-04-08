@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Calendar as CalendarIcon, Trash2, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -50,6 +51,7 @@ type ReceivedItem = {
 };
 
 export default function EntryPage() {
+    const router = useRouter();
     const { toast } = useToast();
     const [entryDate, setEntryDate] = React.useState<Date | undefined>(new Date());
     const [supplier, setSupplier] = React.useState("");
@@ -63,7 +65,26 @@ export default function EntryPage() {
     const [isFinalizing, setIsFinalizing] = React.useState(false);
     const [selectedItemForAddition, setSelectedItemForAddition] = React.useState<Product | null>(null);
     const [entryType, setEntryType] = React.useState<'Oficial' | 'Não Oficial'>('Oficial');
-    const { user } = useAuth();
+    const { user, userRole, loading: authLoading } = useAuth();
+
+    React.useEffect(() => {
+        if (!authLoading && userRole !== "Admin") {
+            toast({
+                title: "Acesso negado",
+                description: "Somente administradores podem registrar entradas.",
+                variant: "destructive",
+            });
+            router.replace("/dashboard");
+        }
+    }, [authLoading, router, toast, userRole]);
+
+    if (authLoading) {
+        return null;
+    }
+
+    if (userRole !== "Admin") {
+        return null;
+    }
 
     const handleSelectSearchItem = (item: Product) => {
         setSelectedItemForAddition(item);

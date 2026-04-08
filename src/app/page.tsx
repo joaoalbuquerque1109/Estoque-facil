@@ -1,15 +1,34 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redireciona direto para dashboard (sem autenticação)
-    router.replace('/dashboard');
+    let isMounted = true;
+
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!isMounted) {
+          return;
+        }
+
+        router.replace(data.session ? "/dashboard" : "/login");
+      })
+      .catch(() => {
+        if (isMounted) {
+          router.replace("/login");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   return (

@@ -2,35 +2,35 @@
 
 import Link from "next/link";
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowLeftFromLine,
+  ArrowRightToLine,
+  ChevronsLeftRight,
   CircleUser,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Package,
-  ArrowRightToLine,
-  ArrowLeftFromLine,
+  ShieldCheck,
   Settings,
-  ChevronsLeftRight,
+  Users,
   Warehouse,
-  Loader2,
 } from "lucide-react";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import {
-  Users
-} from "lucide-react";
-import {
-  SidebarProvider,
   Sidebar,
-  SidebarHeader,
   SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarInset,
-  SidebarTrigger,
   SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
   SidebarSeparator,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -42,43 +42,38 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { toast } = useToast();
   const { user, loading, userRole } = useAuth();
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
-  
-  // TODO: Descomentar após reabilitar página de login
-  // React.useEffect(() => {
-  //   if (!loading) {
-  //     if (!user) {
-  //       router.replace('/login');
-  //     }
-  //   }
-  // }, [user, loading, router]);
+
+  React.useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
 
   const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
-    { href: "/dashboard/inventory", icon: Package, label: "Inventário" },
-    { href: "/dashboard/entry", icon: ArrowRightToLine, label: "Entrada" },
-    { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saída" },
-    { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolução" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Painel", adminOnly: false },
+    { href: "/dashboard/inventory", icon: Package, label: "Inventario", adminOnly: false },
+    { href: "/dashboard/entry", icon: ArrowRightToLine, label: "Entrada", adminOnly: true },
+    { href: "/dashboard/exit", icon: ArrowLeftFromLine, label: "Saida", adminOnly: false },
+    { href: "/dashboard/returns", icon: ChevronsLeftRight, label: "Devolucao", adminOnly: false },
   ];
 
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || userRole === "Admin");
+
   const adminNavItems = [
-    { href: "/dashboard/users", icon: Users, label: "Usuários", adminOnly: true },
-  ]
+    { href: "/dashboard/users", icon: ShieldCheck, label: "Profiles" },
+  ];
 
   const handleSignOut = async () => {
-    // Mock logout - apenas redireciona
-    router.push("/");
+    await supabase.auth.signOut();
+    router.replace("/login");
   };
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -87,121 +82,117 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    router.replace("/login");
     return null;
   }
-
-  // Renderiza direto sem verificações de autenticação
 
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader className="mb-3 ml-5">
-            <div className="flex items-center gap-2 p-2">
-                <Warehouse className="w-8 h-8 text-primary" />
-                <span className="text-xl font-semibold mt-1">AlmoxFlow</span>
-            </div>
+          <div className="flex items-center gap-2 p-2">
+            <Warehouse className="h-8 w-8 text-primary" />
+            <span className="mt-1 text-xl font-semibold">AlmoxFlow</span>
+          </div>
         </SidebarHeader>
         <hr className="mx-6" />
         <SidebarContent className="mt-4">
-            <SidebarMenu>
-              {navItems.map((item) => (
+          <SidebarMenu>
+            {visibleNavItems.map((item) => (
+              <SidebarMenuItem key={item.label}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.label}
+                  className="h-12 justify-start"
+                >
+                  <Link href={item.href}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+            {userRole === "Admin" && (
+              <>
+                <SidebarSeparator className="my-2" />
+                {adminNavItems.map((item) => (
                   <SidebarMenuItem key={item.label}>
-                  <SidebarMenuButton
+                    <SidebarMenuButton
                       asChild
                       isActive={pathname === item.href}
                       tooltip={item.label}
                       className="h-12 justify-start"
-                  >
+                    >
                       <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.label}</span>
+                        <item.icon />
+                        <span>{item.label}</span>
                       </Link>
-                  </SidebarMenuButton>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
-              ))}
-              {userRole === 'Admin' && adminNavItems.map((item) => (
-                 <SidebarMenuItem key={item.label}>
-                 <SidebarMenuButton
-                     asChild
-                     isActive={pathname === item.href}
-                     tooltip={item.label}
-                     className="h-12 justify-start"
-                 >
-                     <Link href={item.href}>
-                     <item.icon />
-                     <span>{item.label}</span>
-                     </Link>
-                 </SidebarMenuButton>
-                 </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+                ))}
+              </>
+            )}
+          </SidebarMenu>
         </SidebarContent>
         <SidebarSeparator />
         <SidebarFooter className="mb-5 mt-1">
-            <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="justify-start w-full h-auto px-2 py-2">
-                <div className="flex justify-between w-full items-center">
-                    <div className="flex gap-2 items-center">
-                    <Avatar className="w-8 h-8">
-                        <AvatarFallback>{user.email ? user.email[0].toUpperCase() : 'U'}</AvatarFallback>
+              <Button variant="ghost" className="h-auto w-full justify-start px-2 py-2">
+                <div className="flex w-full items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{user.email ? user.email[0].toUpperCase() : "U"}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col items-start text-sm">
-                        <span className="font-medium text-sidebar-foreground">
-                            {user.email && user.email.length > 18
-                                  ? `${user.email.substring(0, 18)}...`
-                                  : user.email}
-                        </span>
-                        <span className="text-muted-foreground text-xs">{userRole}</span>
+                      <span className="font-medium text-sidebar-foreground">
+                        {user.email && user.email.length > 18 ? `${user.email.substring(0, 18)}...` : user.email}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{userRole}</span>
                     </div>
-                    </div>
+                  </div>
                 </div>
-                </Button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
+              <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
-                Configurações
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
+                Configuracoes
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
-                </DropdownMenuItem>
+              </DropdownMenuItem>
             </DropdownMenuContent>
-            </DropdownMenu>
+          </DropdownMenu>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 md:hidden">
-            <SidebarTrigger className="sm:hidden -ml-2" />
-            <DropdownMenu>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6 md:hidden">
+          <SidebarTrigger className="-ml-2 sm:hidden" />
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
-                variant="outline"
-                size="icon"
-                className="overflow-hidden rounded-full ml-auto"
-                >
+              <Button variant="outline" size="icon" className="ml-auto overflow-hidden rounded-full">
                 <CircleUser className="h-5 w-5" />
-                </Button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{userRole}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
+              <DropdownMenuLabel>{userRole}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
-                Configurações
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
+                Configuracoes
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
-                </DropdownMenuItem>
+              </DropdownMenuItem>
             </DropdownMenuContent>
-            </DropdownMenu>
+          </DropdownMenu>
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-6">{children}</main>
       </SidebarInset>
