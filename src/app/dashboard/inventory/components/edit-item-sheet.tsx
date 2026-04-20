@@ -33,7 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import {
+  PRODUCT_CATEGORIES,
+  isProductCategory,
+  normalizeProductCategory,
+} from "@/lib/product-categories";
 
 
 const formSchema = z.object({
@@ -44,17 +48,8 @@ const formSchema = z.object({
   unit: z.string().min(1, "A unidade é obrigatória."),
   quantity: z.coerce.number().min(0, "A quantidade deve ser um número positivo."),
   reference: z.string().min(1, "A referência é obrigatória."),
-  category: z.string().min(1, "A seleção da categoria é obrigatória."),
-  otherCategory: z.string().optional(),
+  category: z.string().refine((category): boolean => isProductCategory(category), "Selecione uma categoria válida."),
   image: z.any().optional(),
-}).refine(data => {
-  if (data.category === 'Outro') {
-    return data.otherCategory && data.otherCategory.length > 0;
-  }
-  return true;
-}, {
-  message: "Por favor, especifique a categoria.",
-  path: ["otherCategory"],
 });
 
 
@@ -68,7 +63,6 @@ interface EditItemSheetProps {
 }
 
 export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: EditItemSheetProps) {
-  const { toast } = useToast();
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -78,10 +72,6 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
   
   React.useEffect(() => {
     if (item && isOpen) {
-      const standardCategories = ['Escritório', 'Limpeza'];
-      
-      const isStandardCategory = standardCategories.includes(item.category);
-
       form.reset({
         name: item.name,
         materialType: item.type,
@@ -90,8 +80,7 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
         unit: item.unit,
         quantity: item.quantity,
         reference: item.reference,
-        category: isStandardCategory ? item.category : 'Outro',
-        otherCategory: isStandardCategory ? '' : item.category,
+        category: normalizeProductCategory(item.category),
         
         image: null,
       });
@@ -99,7 +88,6 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
     }
   }, [item, form, isOpen]);
 
-  const categoryValue = form.watch("category");
   const materialType = form.watch("materialType");
 
   React.useEffect(() => {
@@ -290,39 +278,24 @@ export function EditItemSheet({ isOpen, onOpenChange, onItemUpdated, item }: Edi
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Categoria</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione uma categoria" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Escritório">Escritório</SelectItem>
-                          <SelectItem value="Limpeza">Limpeza</SelectItem>
-                          <SelectItem value="Transito">Trânsito</SelectItem>
-                          <SelectItem value="EPI">EPI</SelectItem>
-                          <SelectItem value="Outro">Outro</SelectItem>
+                          {PRODUCT_CATEGORIES.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {categoryValue === 'Outro' && (
-                  <FormField
-                    control={form.control}
-                    name="otherCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Especifique a Categoria</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Digite o nome da nova categoria" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
               </>
               <FormField
                 control={form.control}

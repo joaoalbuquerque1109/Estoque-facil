@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { PRODUCT_CATEGORIES, isProductCategory } from "@/lib/product-categories";
 
 const formSchema = z.object({
   name: z.string().min(1, "O nome do item é obrigatório."),
@@ -41,22 +41,13 @@ const formSchema = z.object({
   patrimony: z.string().optional(),
   unit: z.string().min(1, "A unidade é obrigatória."),
   initialQuantity: z.coerce.number().min(0, "A quantidade deve ser um número positivo."),
-  category: z.string().min(1, "A seleção da categoria é obrigatória."),
-  otherCategory: z.string().optional(),
+  category: z.string().refine((category): boolean => isProductCategory(category), "Selecione uma categoria válida."),
   image: z.object({
     base64: z.string(),
     fileName: z.string(),
     contentType: z.string(),
   }).optional(),
   reference: z.string().min(1, "A referência é obrigatória."),
-}).refine(data => {
-  if (data.category === 'Outro') {
-    return data.otherCategory && data.otherCategory.length > 0;
-  }
-  return true;
-}, {
-  message: "Por favor, especifique a categoria.",
-  path: ["otherCategory"],
 });
 
 type AddItemFormValues = z.infer<typeof formSchema>;
@@ -68,7 +59,6 @@ interface AddItemSheetProps {
 }
 
 export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheetProps) {
-  const { toast } = useToast();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -86,7 +76,6 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
       reference: "",
     },
   });
-  const categoryValue = form.watch("category");
   const materialType = form.watch("materialType");
 
   useEffect(() => {
@@ -175,7 +164,7 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Material</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o tipo de material" />
@@ -277,39 +266,24 @@ export function AddItemSheet({ isOpen, onOpenChange, onItemAdded }: AddItemSheet
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Categoria</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione uma categoria" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Escritório">Escritório</SelectItem>
-                          <SelectItem value="Limpeza">Limpeza</SelectItem>
-                          <SelectItem value="Transito">Trânsito</SelectItem>
-                          <SelectItem value="EPI">EPI</SelectItem>
-                          <SelectItem value="Outro">Outro</SelectItem>
+                          {PRODUCT_CATEGORIES.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {categoryValue === 'Outro' && (
-                  <FormField
-                    control={form.control}
-                    name="otherCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Especifique a Categoria</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Digite o nome da nova categoria" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
               </>
               <FormField
                 control={form.control}

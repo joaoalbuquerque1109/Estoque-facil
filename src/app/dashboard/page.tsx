@@ -202,11 +202,10 @@ export default function DashboardPage() {
             return;
         }
 
-        const productsSnapshot = await getDocs(collection(db, "products"));
-        const productsData = productsSnapshot.docs.reduce((acc, doc) => {
-            acc[doc.id] = doc.data();
+        const productsData = (await getProducts()).reduce<Record<string, Product>>((acc, product) => {
+            acc[product.id] = product;
             return acc;
-        }, {} as { [id: string]: any });
+        }, {});
         
         const csvData = movementsToExport.map(m => ({
             Data: format(parseISO(m.date), "dd/MM/yyyy HH:mm"),

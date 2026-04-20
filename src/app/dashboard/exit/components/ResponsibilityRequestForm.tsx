@@ -198,6 +198,8 @@ export default function ResponsibilityRequestForm() {
       requestDate: responsibilityDate?.toISOString() || new Date().toISOString(),
       requesterName: responsibleName,
       requesterDocument: responsibleId,
+      responsibleName,
+      responsibleDocument: responsibleId,
       department,
       purpose: projectDescription,
       submittedByEmail: user?.email || "Desconhecido",

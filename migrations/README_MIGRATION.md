@@ -147,11 +147,9 @@ SUPABASE_SERVICE_ROLE_KEY=seu_service_role_key_aqui
 
 ## Dados de Teste
 
-O script incluir 10 produtos de exemplo:
-- 4 produtos de consumo (canetas, papel)
-- 3 produtos permanentes (monitor, mouse, teclado)
-- 2 móveis
-- 1 grampeador
+O script inclui 10 produtos de exemplo alinhados ao controle de insumos e medicações:
+- Produtos da categoria `Insumos`
+- Produtos da categoria `Medicação`
 
 Você pode deletar esses dados depois ou usar como base para testes.
 

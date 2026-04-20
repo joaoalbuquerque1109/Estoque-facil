@@ -1,4 +1,5 @@
 import { parseISO } from "date-fns";
+import { normalizeProductCategory } from "./product-categories";
 import { supabase } from "./supabase";
 
 export type Product = {
@@ -221,7 +222,11 @@ export const getProducts = async (filters: ProductFilters = {}): Promise<Product
 
 export const addProduct = async (productData: Omit<Product, "id">): Promise<string> => {
   try {
-    const { data, error } = await supabase.from("products").insert([productData]).select("id").single();
+    const { data, error } = await supabase
+      .from("products")
+      .insert([{ ...productData, category: normalizeProductCategory(productData.category) }])
+      .select("id")
+      .single();
 
     if (error) {
       throw error;
@@ -236,7 +241,12 @@ export const addProduct = async (productData: Omit<Product, "id">): Promise<stri
 
 export const updateProduct = async (productId: string, productData: Partial<Product>): Promise<void> => {
   try {
-    const { error } = await supabase.from("products").update(productData).eq("id", productId);
+    const normalizedProductData =
+      productData.category === undefined
+        ? productData
+        : { ...productData, category: normalizeProductCategory(productData.category) };
+
+    const { error } = await supabase.from("products").update(normalizedProductData).eq("id", productId);
 
     if (error) {
       throw error;

@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/lib/firestore";
 import { getProducts, addProduct, updateProduct, deleteProduct, addMovement, uploadImage, generateNextItemCode } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeProductCategory } from "@/lib/product-categories";
 
 export default function InventoryPage() {
   const { user, userRole } = useAuth();
@@ -93,7 +94,6 @@ const handleAddItem = React.useCallback(async (newItemData: {
   itemCode?: string;
   patrimony?: string;
   reference?: string;
-  otherCategory?: string;
 }) => {
   setIsLoading(true);
   try {
@@ -102,15 +102,12 @@ const handleAddItem = React.useCallback(async (newItemData: {
     if (newItemData.image) {
       imageUrl = await uploadImage(newItemData.image);
     }
-    const categoryPrefix = newItemData.category.substring(0, 3).toUpperCase();
+    const finalCategory = normalizeProductCategory(newItemData.category);
+    const categoryPrefix = finalCategory.substring(0, 3).toUpperCase();
     const namePrefix = newItemData.name.substring(0, 3).toUpperCase();
     const codePrefix = `${categoryPrefix}-${namePrefix}`;
 
     const generatedCode = await generateNextItemCode(codePrefix);
-
-    const finalCategory = newItemData.category === 'Outro' 
-      ? newItemData.otherCategory 
-      : newItemData.category;
 
 
     const newProduct: Omit<Product, 'id'> = {
@@ -121,7 +118,7 @@ const handleAddItem = React.useCallback(async (newItemData: {
       type: newItemData.materialType,
       quantity: newItemData.initialQuantity || 0,
       unit: newItemData.unit,
-      category: finalCategory || '',
+      category: finalCategory,
       image: imageUrl,
       reference: newItemData.reference || ''
     };
@@ -163,9 +160,7 @@ const handleUpdateItem = async (updatedItemData: any) => {
       imageUrl = await uploadImage(updatedItemData.image);
     }
 
-    const finalCategory = updatedItemData.category === 'Outro' && updatedItemData.otherCategory 
-      ? updatedItemData.otherCategory 
-      : updatedItemData.category;
+    const finalCategory = normalizeProductCategory(updatedItemData.category);
 
     const updateData: Partial<Product> = {
         name: updatedItemData.name,

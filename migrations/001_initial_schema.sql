@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   type product_type NOT NULL,
   quantity INTEGER NOT NULL DEFAULT 0,
   unit TEXT NOT NULL,
-  category TEXT NOT NULL,
+  category TEXT NOT NULL CONSTRAINT products_category_allowed CHECK (category IN ('Medicação', 'Insumos')),
   reference TEXT NOT NULL DEFAULT 'N/A',
   image TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
@@ -266,16 +266,16 @@ CREATE POLICY "Only admins can delete movements"
 
 INSERT INTO public.products (name, name_lowercase, code, patrimony, type, quantity, unit, category, reference, image)
 VALUES
-  ('Caneta Azul', 'caneta azul', '001-25', 'N/A', 'consumo'::product_type, 92, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
-  ('Caneta Preta', 'caneta preta', '002-25', 'N/A', 'consumo'::product_type, 63, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
-  ('Caneta Vermelha', 'caneta vermelha', '003-25', 'N/A', 'consumo'::product_type, 19, 'und', 'Escritório', 'Prateleira A-01', 'https://placehold.co/40x40.png'),
-  ('Papel A4', 'papel a4', '005-25', 'N/A', 'consumo'::product_type, 11, 'Resma', 'Escritório', 'Prateleira B-02', 'https://placehold.co/40x40.png'),
-  ('Monitor Dell 24''', 'monitor dell 24''''', '004-25', '123456', 'permanente'::product_type, 1, 'und', 'Informática', 'Sala TI', 'https://placehold.co/40x40.png'),
-  ('Mouse Logitech', 'mouse logitech', '006-25', '123457', 'permanente'::product_type, 5, 'und', 'Informática', 'Sala TI', 'https://placehold.co/40x40.png'),
-  ('Teclado ABNT2', 'teclado abnt2', '007-25', 'N/A', 'consumo'::product_type, 8, 'und', 'Informática', 'Armário TI', 'https://placehold.co/40x40.png'),
-  ('Cadeira de Escritório', 'cadeira de escritório', '008-25', '123458', 'permanente'::product_type, 3, 'und', 'Mobiliário', 'Sala Administrativa', 'https://placehold.co/40x40.png'),
-  ('Grampeador', 'grampeador', '009-25', 'N/A', 'consumo'::product_type, 25, 'und', 'Escritório', 'Prateleira C-03', 'https://placehold.co/40x40.png'),
-  ('Clips de Papel', 'clips de papel', '010-25', 'N/A', 'consumo'::product_type, 10, 'caixa', 'Escritório', 'Prateleira C-03', 'https://placehold.co/40x40.png')
+  ('Micropore 5cm', 'micropore 5cm', 'INS-MIC-001', 'N/A', 'consumo'::product_type, 1, 'und', 'Insumos', 'Vencimento 07/30', 'https://placehold.co/40x40.png'),
+  ('Fio Vicryl 2-0', 'fio vicryl 2-0', 'INS-FIO-001', 'N/A', 'consumo'::product_type, 1, 'und', 'Insumos', 'Vencimento 06/29', 'https://placehold.co/40x40.png'),
+  ('Algodão rolo', 'algodão rolo', 'INS-ALG-001', 'N/A', 'consumo'::product_type, 2, 'und', 'Insumos', 'N/A', 'https://placehold.co/40x40.png'),
+  ('Compressa de gazes', 'compressa de gazes', 'INS-COM-001', 'N/A', 'consumo'::product_type, 2, 'und', 'Insumos', 'Vencimento 08/30', 'https://placehold.co/40x40.png'),
+  ('Dipirona', 'dipirona', 'MED-DIP-001', 'N/A', 'consumo'::product_type, 5, 'und', 'Medicação', 'Vencimento 04/26', 'https://placehold.co/40x40.png'),
+  ('Dexametasona', 'dexametasona', 'MED-DEX-001', 'N/A', 'consumo'::product_type, 12, 'und', 'Medicação', 'Vencimento 09/27', 'https://placehold.co/40x40.png'),
+  ('Escopolamina', 'escopolamina', 'MED-ESC-001', 'N/A', 'consumo'::product_type, 7, 'und', 'Medicação', 'Vencimento 09/28', 'https://placehold.co/40x40.png'),
+  ('Clindamicina', 'clindamicina', 'MED-CLI-001', 'N/A', 'consumo'::product_type, 9, 'und', 'Medicação', 'Vencimento 09/31', 'https://placehold.co/40x40.png'),
+  ('Ceftriaxona', 'ceftriaxona', 'MED-CEF-001', 'N/A', 'consumo'::product_type, 9, 'und', 'Medicação', 'Vencimento 09/32', 'https://placehold.co/40x40.png'),
+  ('Cateter 16G', 'cateter 16g', 'INS-CAT-001', 'N/A', 'consumo'::product_type, 5, 'und', 'Insumos', 'N/A', 'https://placehold.co/40x40.png')
 ON CONFLICT (code) DO NOTHING;
 
 

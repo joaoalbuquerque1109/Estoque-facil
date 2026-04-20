@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import type { Product } from "@/lib/firestore";
 import { addProduct, finalizeEntry, uploadImage, addMovement, generateNextItemCode } from "@/lib/firestore";
 import { useAuth } from "@/contexts/AuthContext"; 
+import { normalizeProductCategory } from "@/lib/product-categories";
 
 type ReceivedItem = {
     id: string;
@@ -134,11 +135,11 @@ export default function EntryPage() {
                 imageUrl = await uploadImage(newItemData.image);
             }
 
-            const categoryPrefix = (newItemData.category === 'Outro' ? newItemData.otherCategory : newItemData.category).substring(0, 3).toUpperCase();
+            const finalCategory = normalizeProductCategory(newItemData.category);
+            const categoryPrefix = finalCategory.substring(0, 3).toUpperCase();
             const namePrefix = newItemData.name.substring(0, 3).toUpperCase();
             const codePrefix = `${categoryPrefix}-${namePrefix}`;
             const generatedCode = await generateNextItemCode(codePrefix);
-            const finalCategory = newItemData.category === 'Outro' && newItemData.otherCategory ? newItemData.otherCategory : newItemData.category;
 
             const newProductData: Omit<Product, 'id'> = {
                 name: newItemData.name,
