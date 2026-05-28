@@ -14,7 +14,7 @@ import {
   UserPlus,
   Warehouse,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, withSupabaseTimeout } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,8 +52,10 @@ export default function LoginPage() {
   React.useEffect(() => {
     let isMounted = true;
 
-    void supabase.auth
-      .getSession()
+    void withSupabaseTimeout(
+      supabase.auth.getSession(),
+      "Nao foi possivel verificar a sessao atual."
+    )
       .then(({ data }) => {
         if (!isMounted) {
           return;
@@ -95,10 +97,13 @@ export default function LoginPage() {
     setIsResendingConfirmation(true);
 
     try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email,
-      });
+      const { error } = await withSupabaseTimeout(
+        supabase.auth.resend({
+          type: "signup",
+          email,
+        }),
+        "Nao foi possivel reenviar a confirmacao. Verifique a conexao com o Supabase."
+      );
 
       if (error) {
         throw error;
@@ -116,10 +121,13 @@ export default function LoginPage() {
   };
 
   const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email.trim(),
-      password: form.password,
-    });
+    const { error } = await withSupabaseTimeout(
+      supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      }),
+      "Nao foi possivel conectar ao Supabase para fazer login."
+    );
 
     if (error) {
       throw error;
@@ -142,13 +150,16 @@ export default function LoginPage() {
       throw new Error("As senhas nao coincidem.");
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email.trim(),
-      password: form.password,
-      options: {
-        data: form.name.trim() ? { name: form.name.trim() } : undefined,
-      },
-    });
+    const { data, error } = await withSupabaseTimeout(
+      supabase.auth.signUp({
+        email: form.email.trim(),
+        password: form.password,
+        options: {
+          data: form.name.trim() ? { name: form.name.trim() } : undefined,
+        },
+      }),
+      "Nao foi possivel conectar ao Supabase para criar o usuario."
+    );
 
     if (error) {
       throw error;

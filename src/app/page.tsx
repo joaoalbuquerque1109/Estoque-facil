@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, withSupabaseTimeout } from "@/lib/supabase";
 
 export default function Home() {
   const router = useRouter();
@@ -11,8 +11,10 @@ export default function Home() {
   useEffect(() => {
     let isMounted = true;
 
-    void supabase.auth
-      .getSession()
+    void withSupabaseTimeout(
+      supabase.auth.getSession(),
+      "Nao foi possivel verificar a sessao atual."
+    )
       .then(({ data }) => {
         if (!isMounted) {
           return;

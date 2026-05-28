@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { supabase, withSupabaseTimeout } from "@/lib/supabase";
 
 type UserRole = "Admin" | "Operator";
 
@@ -89,7 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+        } = await withSupabaseTimeout(
+          supabase.auth.getSession(),
+          "Nao foi possivel verificar a sessao atual."
+        );
 
         await syncSession(session);
       } catch (error) {
@@ -130,10 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Nao ha usuario autenticado para revalidar.");
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password,
-    });
+    const { data, error } = await withSupabaseTimeout(
+      supabase.auth.signInWithPassword({
+        email: user.email,
+        password,
+      }),
+      "Nao foi possivel conectar ao Supabase para revalidar o usuario."
+    );
 
     if (error) {
       throw error;
